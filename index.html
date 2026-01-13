@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Мысли</title>
+
+<style>
+:root {
+  --bg1: #a8edea;
+  --bg2: #fed6e3;
+  --card: rgba(255,255,255,0.88);
+  --text: #1f2937;
+  --muted: #6b7280;
+  --accent: #ff7a7a;
+  --danger: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--bg1), var(--bg2));
+  color: var(--text);
+}
+
+.container {
+  max-width: 720px;
+  margin: auto;
+  padding: 16px;
+}
+
+h1 {
+  text-align: center;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  background: var(--card);
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.tab.active {
+  background: white;
+  color: var(--text);
+}
+
+.section {
+  display: none;
+}
+
+.section.active {
+  display: block;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+}
+
+input, textarea {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.95);
+  font-size: 14px;
+}
+
+textarea {
+  height: 110px;
+  resize: none;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.counter {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+button.main {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.like {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.delete {
+  cursor: pointer;
+  color: var(--danger);
+}
+
+.empty {
+  text-align: center;
+  color: var(--muted);
+  margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Мысли</h1>
+
+  <div class="tabs">
+    <button class="tab active" onclick="openTab('write', this)">✍️ Написать</button>
+    <button class="tab" onclick="openTab('feed', this)">📖 Мысли</button>
+  </div>
+
+  <!-- НАПИСАТЬ -->
+  <div id="write" class="section active">
+    <div class="card">
+      <input id="name" placeholder="Никнейм (необязательно)" maxlength="20">
+      <textarea id="text" placeholder="Напиши свою мысль..."></textarea>
+      <div class="actions">
+        <div class="counter"><span id="count">0</span>/400</div>
+        <button class="main" onclick="publish()">Опубликовать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ЛЕНТА -->
+  <div id="feed" class="section">
+    <div class="feed" id="feedList"></div>
+    <div id="empty" class="empty">Пока здесь пусто 🌤</div>
+  </div>
+</div>
+
+<script>
+const MAX = 400;
+const textInput = document.getElementById("text");
+const counter = document.getElementById("count");
+const feedList = document.getElementById("feedList");
+const empty = document.getElementById("empty");
+
+// 🔐 уникальный ID автора
+let authorId = localStorage.getItem("authorId");
+if (!authorId) {
+  authorId = crypto.randomUUID();
+  localStorage.setItem("authorId", authorId);
+}
+
+textInput.addEventListener("input", () => {
+  if (textInput.value.length > MAX) {
+    textInput.value = textInput.value.slice(0, MAX);
+  }
+  counter.textContent = textInput.value.length;
+});
+
+function openTab(id, btn) {
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  btn.classList.add("active");
+}
+
+function load() {
+  return JSON.parse(localStorage.getItem("thoughts") || "[]");
+}
+
+function save(data) {
+  localStorage.setItem("thoughts", JSON.stringify(data));
+}
+
+function publish() {
+  const text = textInput.value.trim();
+  if (!text) return;
+
+  const name = document.getElementById("name").value.trim() || "Аноним";
+
+  const thoughts = load();
+  thoughts.unshift({
+    id: Date.now(),
+    authorId,
+    name,
+    text,
+    date: new Date().toLocaleString(),
+    likes: 0
+  });
+
+  save(thoughts);
+  textInput.value = "";
+  counter.textContent = 0;
+
+  openTab('feed', document.querySelectorAll('.tab')[1]);
+  render();
+}
+
+function like(id) {
+  const thoughts = load();
+  const t = thoughts.find(t => t.id === id);
+  if (t) t.likes++;
+  save(thoughts);
+  render();
+}
+
+function removeThought(id) {
+  if (!confirm("Удалить эту мысль?")) return;
+  let thoughts = load();
+  thoughts = thoughts.filter(t => t.id !== id);
+  save(thoughts);
+  render();
+}
+
+function render() {
+  const thoughts = load();
+  feedList.innerHTML = "";
+  empty.style.display = thoughts.length ? "none" : "block";
+
+  thoughts.forEach(t => {
+    const isOwner = t.authorId === authorId;
+
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerHTML = `
+      <div class="meta">
+        <span>${t.name}</span>
+        <span>${t.date}</span>
+      </div>
+      <div>${t.text}</div>
+      <div class="controls">
+        <span class="like" onclick="like(${t.id})">❤️ ${t.likes}</span>
+        ${isOwner ? `<span class="delete" onclick="removeThought(${t.id})">🗑 Удалить</span>` : ``}
+      </div>
+    `;
+    feedList.appendChild(div);
+  });
+}
+
+render();
+</script>
+
+</body>
+</html>
